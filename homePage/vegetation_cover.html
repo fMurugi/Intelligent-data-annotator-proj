@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation Cover Over Time</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-timedimension@1.1.0/dist/leaflet.timedimension.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-timedimension@1.1.0/dist/leaflet.timedimension.control.min.css"/>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center;">Vegetation Cover Over Time</h1>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map', { zoom: 12, center: [-1.286389, 36.817223] }); // Nairobi
+
+        // Add a tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // TimeDimension plugin setup
+        var timeDimension = new L.TimeDimension({
+            period: "P1Y" // One year per step
+        });
+        map.timeDimension = timeDimension;
+
+        var timeDimensionControl = new L.Control.TimeDimension({
+            position: "bottomleft",
+            autoPlay: false,
+            loopButton: true,
+            timeSliderDragUpdate: true
+        });
+        map.addControl(timeDimensionControl);
+
+        // NDVI or Vegetation Layer
+        var vegetationLayer = L.tileLayer(
+            // 'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/7148ffc520ba3d6c41d9baf1a7e0dd33-192dd161ab5900226ad73c4fbf4a800c/tiles/%7Bz%7D/%7Bx%7D/%7By%7D?key=AIzaSyCqWicEOqXcQFPLh9acY6mVHiDZ9XVX8l8', 
+            // 'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/b978cd70fb248039cefac65905ea3583-1af9d360afee637d0eb2f6987957621d/tiles/%7Bz%7D/%7Bx%7D/%7By%7D?key=AIzaSyCqWicEOqXcQFPLh9acY6mVHiDZ9XVX8l8',
+            // 'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/b978cd70fb248039cefac65905ea3583-1af9d360afee637d0eb2f6987957621d/tiles/{z}/{x}/{y}?key=AIzaSyCqWicEOqXcQFPLh9acY6mVHiDZ9XVX8l8',
+            // 'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/b978cd70fb248039cefac65905ea3583-1af9d360afee637d0eb2f6987957621d/tiles/{z}/{x}/{y}',
+            'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/b7ad85af47080cb3bcd8b9028d76aa02-bae4447df70742e6b1dbdd6f8e2d6de3/tiles/{z}/{x}/{y}',
+
+            {
+                attribution: "Google Earth Engine - NDVI",
+                opacity: 0.7,
+                bounds: [[-1.5, 36.5], [-1.0, 37.0]] // Approximate bounds of Nairobi
+                // bounds: [[-1.29, 36.81], [-1.27, 36.83]] 
+            }
+        );
+
+        // Manually wrap the vegetation layer with TimeDimension support
+        // var timeDimensionLayer = new L.TimeDimension.Layer(vegetationLayer, {
+        //     updateTimeDimension: true,
+        //     updateTimeDimensionMode: 'replace',
+        //     requestTimeFromCapabilities: true
+        // });
+
+        // // Add TimeDimension layer to the map
+        // timeDimensionLayer.addTo(map);
+        
+        vegetationLayer.addTo(map);
+    </script>
+</body>
+</html>

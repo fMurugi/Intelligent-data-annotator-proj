@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map with Menu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #menu {
+            width: 20%;
+            background-color: #f8f9fa;
+            padding: 15px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+        #map {
+            flex: 1;
+        }
+        .menu-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+            display: block;
+        }
+        .menu-item:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h3>Links</h3>
+        <a class="menu-item" href="https://colab.research.google.com/github/opengeos/segment-geospatial/blob/main/docs/examples/text_prompts.ipynb#scrollTo=b82_55cWQUlY" target="_blank">Open Google Colab</a>
+        <a class="menu-item" href="https://colab.research.google.com/notebooks/intro.ipynb" target="_blank">Intro Notebook</a>
+        <a class="menu-item" href="https://colab.research.google.com/notebooks/mlcc/first_steps_with_tensorflow.ipynb" target="_blank">TensorFlow Guide</a>
+        <a class="menu-item" href="vegetation_cover.html" target="_blank">View Vegetation Cover</a>
+
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([-1.286389, 36.817223], 13); // Coordinates for Nairobi, Kenya
+
+        // Add a tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add a marker
+        L.marker([-1.286389, 36.817223]).addTo(map)
+            .bindPopup('Nairobi, Kenya')
+            .openPopup();
+    </script>
+</body>
+</html>
