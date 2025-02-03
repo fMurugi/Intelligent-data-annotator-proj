@@ -51,3 +51,12 @@ Now open http://0.0.0.0:8000/vegetation_cover.html in your browser.
     Google Earth Engine (GEE) - NDVI data
     Leaflet.js - Interactive map
     HTML, JavaScript, CSS - Frontend UI
+
+
+# setting up google earth engine
+    ensure you have a project
+    in google cloud console enable earth engine API
+    run this command to authenticate locally in a venv
+    ```bash
+    earthengine authenticate
+    ```
