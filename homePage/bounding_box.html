@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation Cover Over Time</title>
+
+    <!-- Leaflet & Map Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align:center;">Vegetation Cover Over Time</h1>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([-1.28333, 36.82194], 10); // Centered on Nairobi
+
+        // Add base map layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Leaflet Draw setup
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            draw: {
+                polyline: false,
+                polygon: false,
+                circle: false,
+                marker: false,
+                circlemarker: false,
+                rectangle: true // Enable rectangle drawing
+            },
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+        map.addControl(drawControl);
+
+        // Function to fetch NDVI data from Flask API
+        function fetchVegetationData(southWest, northEast) {
+            console.log("Fetching NDVI for:", southWest, northEast);
+
+            // Send coordinates to backend (Flask API)
+            fetch('http://127.0.0.1:5000/get_ndvi', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    south: southWest.lat,
+                    west: southWest.lng,
+                    north: northEast.lat,
+                    east: northEast.lng
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("NDVI URL:", data.map_url);
+
+                // Add the NDVI map as a tile layer
+                var vegetationLayer = L.tileLayer(data.map_url, { 
+                    tileSize: 256,  // ✅ Required for GEE tile layers
+                    opacity: 0.7 
+                });
+                vegetationLayer.addTo(map);
+            })
+            .catch(error => console.error("Error fetching NDVI data:", error));
+        }
+
+        // Handle rectangle drawing
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            drawnItems.addLayer(layer);
+
+            // Get bounding box coordinates
+            var bounds = layer.getBounds();
+            var southWest = bounds.getSouthWest();
+            var northEast = bounds.getNorthEast();
+
+            // Fetch vegetation data for selected area
+            fetchVegetationData(southWest, northEast);
+        });
+    </script>
+
+</body>
+</html>
