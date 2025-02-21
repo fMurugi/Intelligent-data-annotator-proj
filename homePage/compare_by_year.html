@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Vegetation Cover Over Time</title>
+
+    <!-- Leaflet & Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+        }
+        /* .map-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        } */
+        .map-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            border: 2px solid black;  /* ✅ Adds a border around each map */
+            margin: 5px;  /* ✅ Adds spacing between maps */
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);  /* ✅ Adds a shadow effect */
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <input id="search-input" type="text" placeholder="Search for a place (e.g., Mount Kenya Forest)">
+        <button id="search-btn">Search</button>
+        <label for="past-year">Past Year:</label>
+        <input type="number" id="past-year" min="2000" max="2025" value="2000">
+        <label for="current-year">Current Year:</label>
+        <input type="number" id="current-year" min="2000" max="2025" value="2025">
+    </div>
+
+    <div class="map-container">
+        <h3 style="text-align:center;">Past NDVI</h3>
+        <div id="map-left" style="height: 90%;"></div>
+    </div>
+    
+    <div class="map-container">
+        <h3 style="text-align:center;">Current NDVI</h3>
+        <div id="map-right" style="height: 90%;"></div>
+    </div>
+
+    <script>
+        // Initialize two maps
+        var mapLeft = L.map('map-left').setView([-1.28333, 36.82194], 8);
+        var mapRight = L.map('map-right').setView([-1.28333, 36.82194], 8);
+
+        // Add base map layers
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(mapLeft);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(mapRight);
+
+        // Prevent infinite loop when synchronizing maps
+        let isSyncing = false;
+        function syncMaps(sourceMap, targetMap) {
+            sourceMap.on("moveend", function () {
+                if (isSyncing) return;
+                isSyncing = true;
+                targetMap.setView(sourceMap.getCenter(), sourceMap.getZoom(), { animate: false });
+                isSyncing = false;
+            });
+        }
+
+        // Apply synchronization
+        syncMaps(mapLeft, mapRight);
+        syncMaps(mapRight, mapLeft);
+
+        var leftLayer, rightLayer;
+        let lastSearchBounds = null;
+
+        function searchLocation() {
+            var query = document.getElementById("search-input").value;
+            if (!query) {
+                alert("Please enter a location name!");
+                return;
+            }
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert("Location not found!");
+                        return;
+                    }
+
+                    var lat = parseFloat(data[0].lat);
+                    var lon = parseFloat(data[0].lon);
+                    var bounds = [
+                        [lat - 0.1, lon - 0.1], 
+                        [lat + 0.1, lon + 0.1]  
+                    ];
+
+                    mapLeft.fitBounds(bounds);
+                    mapRight.fitBounds(bounds);
+
+                    lastSearchBounds = bounds;
+
+                    fetchNDVI(bounds[0], bounds[1], document.getElementById("past-year").value, "left");
+                    fetchNDVI(bounds[0], bounds[1], document.getElementById("current-year").value, "right");
+                })
+                .catch(error => console.error("Error fetching location:", error));
+        }
+
+        function fetchNDVI(southWest, northEast, year, side) {
+            console.log("Fetching NDVI for:", southWest, northEast, "Year:", year, "Side:", side);
+
+            fetch('http://127.0.0.1:5000/get_ndvi', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    south: southWest[0],
+                    west: southWest[1],
+                    north: northEast[0],
+                    east: northEast[1],
+                    year: year
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("NDVI API Response:", data);
+
+                if (!data.map_url) {
+                    alert("Failed to load vegetation data.");
+                    return;
+                }
+
+                let newLayer = L.tileLayer(data.map_url, { opacity: 0.7 });
+
+                if (side === "left") {
+                    if (leftLayer) mapLeft.removeLayer(leftLayer);
+                    leftLayer = newLayer;
+                    leftLayer.addTo(mapLeft);
+                } else {
+                    if (rightLayer) mapRight.removeLayer(rightLayer);
+                    rightLayer = newLayer;
+                    rightLayer.addTo(mapRight);
+                }
+            })
+            .catch(error => console.error("Error fetching NDVI data:", error));
+        }
+
+        document.getElementById("search-btn").addEventListener("click", searchLocation);
+        document.getElementById("past-year").addEventListener("change", function () {
+            if (lastSearchBounds) fetchNDVI(lastSearchBounds[0], lastSearchBounds[1], this.value, "left");
+        });
+        document.getElementById("current-year").addEventListener("change", function () {
+            if (lastSearchBounds) fetchNDVI(lastSearchBounds[0], lastSearchBounds[1], this.value, "right");
+        });
+
+    </script>
+
+</body>
+</html>
