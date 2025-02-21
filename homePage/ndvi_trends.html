@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation NDVI Trends Over Time</title>
+
+    <!-- Leaflet & Chart.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map {
+            height: 50vh;
+            width: 100%;
+        }
+        #controls {
+            text-align: center;
+            padding: 10px;
+            background: white;
+        }
+        #chart-container {
+            width: 80%;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align:center;">Vegetation NDVI Trends Over Time</h2>
+
+    <div id="controls">
+        <input id="search-input" type="text" placeholder="Search for a land area (e.g., Mount Kenya Forest)">
+        <button id="search-btn">Search</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="chart-container">
+        <canvas id="ndvi-chart"></canvas>
+    </div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([-1.28333, 36.82194], 8);
+
+        // Add base map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var ndviChart;
+        let lastSearchBounds = null;
+
+        function searchLocation() {
+            var query = document.getElementById("search-input").value;
+            if (!query) {
+                alert("Please enter a valid land location!");
+                return;
+            }
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert("Land location not found! Try another place.");
+                        return;
+                    }
+
+                    var lat = parseFloat(data[0].lat);
+                    var lon = parseFloat(data[0].lon);
+                    var bounds = [
+                        [lat - 0.1, lon - 0.1], 
+                        [lat + 0.1, lon + 0.1]  
+                    ];
+
+                    map.fitBounds(bounds);
+                    lastSearchBounds = bounds;
+
+                    fetchVegetationNDVI(bounds[0], bounds[1]);
+                })
+                .catch(error => console.error("Error fetching location:", error));
+        }
+
+        function fetchVegetationNDVI(southWest, northEast) {
+            console.log("Fetching NDVI trends for:", southWest, northEast);
+
+            fetch('http://127.0.0.1:5000/get_ndvi_trends', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    south: southWest[0],
+                    west: southWest[1],
+                    north: northEast[0],
+                    east: northEast[1]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("NDVI Trends Response:", data);
+
+                if (!data.years || !data.ndvi_values) {
+                    alert("Failed to load vegetation NDVI trends.");
+                    return;
+                }
+
+                updateChart(data.years, data.ndvi_values);
+            })
+            .catch(error => console.error("Error fetching NDVI trends:", error));
+        }
+
+        function updateChart(years, ndviValues) {
+            if (ndviChart) {
+                ndviChart.destroy();
+            }
+
+            var ctx = document.getElementById('ndvi-chart').getContext('2d');
+            ndviChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: "Vegetation NDVI Over Time",
+                        data: ndviValues,
+                        borderColor: "green",
+                        backgroundColor: "rgba(0, 255, 0, 0.2)",
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            suggestedMax: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        document.getElementById("search-btn").addEventListener("click", searchLocation);
+    </script>
+
+</body>
+</html>
