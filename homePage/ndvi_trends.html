@@ -8,7 +8,9 @@
     <!-- Leaflet & Chart.js Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
 
     <style>
@@ -41,6 +43,8 @@
     <div id="controls">
         <input id="search-input" type="text" placeholder="Search for a land area (e.g., Mount Kenya Forest)">
         <button id="search-btn">Search</button>
+        <button id="download-report-btn">Download PDF Report</button>
+
     </div>
 
     <div id="map"></div>
@@ -147,8 +151,74 @@
                 }
             });
         }
+        function generatePDFReport() {
+    if (!lastSearchBounds) {
+        alert("Search for a location first to generate a report.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let title = document.getElementById("search-input").value || "Vegetation Cover Report";
+    let textX = 15, textY = 20;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(title, textX, textY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    textY += 10;
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, textX, textY);
+
+    textY += 10;
+    doc.text("Vegetation Cover Trends (NDVI) Analysis:", textX, textY);
+
+    if (!ndviChart || !ndviChart.data.labels.length) {
+        textY += 10;
+        doc.text("No data available. Search for a place first.", textX, textY);
+    } else {
+        // Convert NDVI trend chart to image and add to PDF
+        const chartCanvas = document.getElementById("ndvi-chart");
+        const chartImage = chartCanvas.toDataURL("image/png");
+
+        textY += 10;
+        doc.addImage(chartImage, "PNG", 15, textY, 180, 100);
+        textY += 110;
+
+        // Deforestation risk analysis
+        let ndviValues = ndviChart.data.datasets[0].data;
+        let recentNDVI = ndviValues.slice(-3); // Last 3 NDVI values
+        let decreasingTrend = recentNDVI[0] > recentNDVI[1] && recentNDVI[1] > recentNDVI[2];
+
+        let riskAssessment = decreasingTrend
+            ? "Deforestation risk detected! NDVI is declining in recent years."
+            : "No immediate deforestation risk detected. NDVI appears stable.";
+
+        doc.text("Deforestation Risk Analysis:", textX, textY);
+        textY += 10;
+        doc.setFont("helvetica", "italic");
+        doc.text(riskAssessment, textX, textY);
+        doc.setFont("helvetica", "normal");
+
+        textY += 10;
+
+        // Add NDVI data table
+        let tableData = ndviChart.data.labels.map((year, index) => [year, ndviValues[index].toFixed(2)]);
+        doc.autoTable({
+            startY: textY,
+            head: [["Year", "NDVI Value"]],
+            body: tableData
+        });
+    }
+
+    // Save PDF
+    doc.save(`${title.replace(/\s+/g, "_")}_NDVI_Report.pdf`);
+}
 
         document.getElementById("search-btn").addEventListener("click", searchLocation);
+        document.getElementById("download-report-btn").addEventListener("click", generatePDFReport);
     </script>
 
 </body>
