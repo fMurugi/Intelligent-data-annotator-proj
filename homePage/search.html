@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation Cover Over Time</title>
+
+    <!-- Leaflet & Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            flex: 1;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align:center;">Vegetation Cover Over Time</h1>
+
+    <div id="controls">
+        <input id="search-input" type="text" placeholder="Search for a place (e.g., Mount Kenya Forest)">
+        <button id="search-btn">Search</button>
+        
+        <label for="year">Select Year:</label>
+        <input type="range" id="year-slider" min="2000" max="2025" step="1" value="2025">
+        <span id="selected-year">2025</span>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([-1.28333, 36.82194], 8);
+
+        // Add base map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var vegetationLayer; // Store NDVI layer
+        
+        // Search function
+        function searchLocation() {
+            var query = document.getElementById("search-input").value;
+            if (!query) {
+                alert("Please enter a location name!");
+                return;
+            }
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert("Location not found!");
+                        return;
+                    }
+
+                    var lat = parseFloat(data[0].lat);
+                    var lon = parseFloat(data[0].lon);
+                    var bounds = [
+                        [lat - 0.1, lon - 0.1], 
+                        [lat + 0.1, lon + 0.1]  
+                    ];
+
+                    map.fitBounds(bounds); 
+
+                    fetchVegetationData(bounds[0], bounds[1], document.getElementById("year-slider").value);
+                })
+                .catch(error => console.error("Error fetching location:", error));
+        }
+
+        // Fetch NDVI Data
+        function fetchVegetationData(southWest, northEast, year) {
+            console.log("Fetching NDVI for:", southWest, northEast, "Year:", year);
+
+            fetch('http://127.0.0.1:5000/get_ndvi', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    south: southWest[0],
+                    west: southWest[1],
+                    north: northEast[0],
+                    east: northEast[1],
+                    year: year
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("NDVI API Response:", data);
+
+                if (!data.map_url) {
+                    alert("Failed to load vegetation data.");
+                    return;
+                }
+
+                if (vegetationLayer) {
+                    map.removeLayer(vegetationLayer);
+                }
+
+                vegetationLayer = L.tileLayer(data.map_url, { opacity: 0.7 });
+                vegetationLayer.addTo(map);
+            })
+            .catch(error => console.error("Error fetching NDVI data:", error));
+        }
+
+        document.getElementById("search-btn").addEventListener("click", searchLocation);
+        document.getElementById("year-slider").addEventListener("input", function () {
+            document.getElementById("selected-year").innerText = this.value;
+            fetchVegetationData([-1.5, 36.5], [-1.0, 37.0], this.value);
+        });
+//         let debounceTimer;
+//         document.getElementById("year-slider").addEventListener("input", function () {
+//         document.getElementById("selected-year").innerText = this.value;
+    
+//         clearTimeout(debounceTimer);  // Clear previous timer
+//         debounceTimer = setTimeout(() => {
+//             fetchVegetationData([-1.5, 36.5], [-1.0, 37.0], this.value);
+//         }, 500);  // Wait 500ms after the user stops sliding
+// });
+
+
+    </script>
+
+</body>
+</html>

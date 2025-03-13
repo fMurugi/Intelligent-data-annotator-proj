@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDVI Trends Over Time</title>
+
+    <!-- Leaflet & Chart.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map {
+            height: 50vh;
+            width: 100%;
+        }
+        #controls {
+            text-align: center;
+            padding: 10px;
+            background: white;
+        }
+        #chart-container {
+            width: 80%;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align:center;">NDVI Trends Over Time</h2>
+
+    <div id="controls">
+        <input id="search-input" type="text" placeholder="Search for a place (e.g., Nairobi, Lake Victoria)">
+        <button id="search-btn">Search</button>
+        <button id="download-report-btn">Download PDF Report</button>
+
+    </div>
+
+    <div id="map"></div>
+
+    <div id="chart-container">
+        <canvas id="ndvi-chart"></canvas>
+    </div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([-1.28333, 36.82194], 8);
+
+        // Add base map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var ndviChart;
+        let lastSearchBounds = null;
+
+        function searchLocation() {
+            var query = document.getElementById("search-input").value;
+            if (!query) {
+                alert("Please enter a valid location!");
+                return;
+            }
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert("Location not found! Try another place.");
+                        return;
+                    }
+
+                    var lat = parseFloat(data[0].lat);
+                    var lon = parseFloat(data[0].lon);
+                    var bounds = [
+                        [lat - 0.1, lon - 0.1], 
+                        [lat + 0.1, lon + 0.1]  
+                    ];
+
+                    map.fitBounds(bounds);
+                    lastSearchBounds = bounds;
+
+                    fetchNDVITrends(bounds[0], bounds[1]);
+                })
+                .catch(error => console.error("Error fetching location:", error));
+        }
+
+        function fetchNDVITrends(southWest, northEast) {
+            console.log("Fetching NDVI trends for:", southWest, northEast);
+
+            fetch('http://127.0.0.1:5000/get_ndvi_trends_generic', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    south: southWest[0],
+                    west: southWest[1],
+                    north: northEast[0],
+                    east: northEast[1]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("NDVI Trends Response:", data);
+
+                if (!data.years || !data.ndvi_values) {
+                    alert("Failed to load NDVI trends.");
+                    return;
+                }
+
+                updateChart(data.years, data.ndvi_values);
+            })
+            .catch(error => console.error("Error fetching NDVI trends:", error));
+        }
+
+        function updateChart(years, ndviValues) {
+            if (ndviChart) {
+                ndviChart.destroy();
+            }
+
+            var ctx = document.getElementById('ndvi-chart').getContext('2d');
+            ndviChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: "NDVI Over Time",
+                        data: ndviValues,
+                        borderColor: function(context) {
+                            let value = context.dataset.data[context.dataIndex];
+                            return value > 0.4 ? "green" : value > 0 ? "yellow" : "blue";
+                        },
+                        backgroundColor: "rgba(0, 255, 0, 0.2)",
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: -1,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        document.getElementById("search-btn").addEventListener("click", searchLocation);
+        document.getElementById("download-report-btn").addEventListener("click", generatePDFReport);
+
+function generatePDFReport() {
+    if (!lastSearchBounds) {
+        alert("Search for a location first to generate a report.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let title = document.getElementById("search-input").value || "Vegetation Cover Report";
+    let textX = 15, textY = 20;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(title, textX, textY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    textY += 10;
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, textX, textY);
+
+    textY += 10;
+    doc.text("Vegetation Cover Trends (NDVI) Analysis:", textX, textY);
+
+    if (!ndviChart || !ndviChart.data.labels.length) {
+        textY += 10;
+        doc.text("No data available. Search for a place first.", textX, textY);
+    } else {
+        // Convert NDVI trend chart to image and add to PDF
+        const chartCanvas = document.getElementById("ndvi-chart");
+        const chartImage = chartCanvas.toDataURL("image/png");
+
+        textY += 10;
+        doc.addImage(chartImage, "PNG", 15, textY, 180, 100);
+        textY += 110;
+
+        // Deforestation risk analysis
+        let ndviValues = ndviChart.data.datasets[0].data;
+        let recentNDVI = ndviValues.slice(-3); // Last 3 NDVI values
+        let decreasingTrend = recentNDVI[0] > recentNDVI[1] && recentNDVI[1] > recentNDVI[2];
+
+        let riskAssessment = decreasingTrend
+            ? "Deforestation risk detected! NDVI is declining in recent years."
+            : "No immediate deforestation risk detected. NDVI appears stable.";
+
+        doc.text("Deforestation Risk Analysis:", textX, textY);
+        textY += 10;
+        doc.setFont("helvetica", "italic");
+        doc.text(riskAssessment, textX, textY);
+        doc.setFont("helvetica", "normal");
+
+        textY += 10;
+
+        // Add NDVI data table
+        let tableData = ndviChart.data.labels.map((year, index) => [year, ndviValues[index].toFixed(2)]);
+        doc.autoTable({
+            startY: textY,
+            head: [["Year", "NDVI Value"]],
+            body: tableData
+        });
+    }
+
+    // Save PDF
+    doc.save(`${title.replace(/\s+/g, "_")}_NDVI_Report.pdf`);
+}
+
+    </script>
+
+</body>
+</html>
+

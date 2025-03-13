@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet.js Satellite Segmentation</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        #map {
+            width: 100%;
+            height: 700px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            background: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #result-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Satellite Image Segmentation</h1>
+    
+    <div id="map"></div>
+    <button id="segment-btn">Segment Image</button>
+    <div id="result-container"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- GeoTIFF.js -->
+    <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+
+    <script>
+        // Initialize the Leaflet map
+        var map = L.map('map').setView([-1.286389, 36.817223], 13); // Default to Nairobi
+
+        // Load OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Initialize drawing tools
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            draw: {
+                rectangle: true, // Enable rectangle drawing
+                polyline: false,
+                circle: false,
+                marker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+
+        var bboxCoords = null;
+
+        // Capture drawn bounding box
+        map.on(L.Draw.Event.CREATED, function (e) {
+            drawnItems.clearLayers(); // Remove previous selections
+            var layer = e.layer;
+            drawnItems.addLayer(layer);
+            
+            if (layer instanceof L.Rectangle) {
+                bboxCoords = layer.getBounds();
+                console.log("Bounding Box:", bboxCoords);
+            }
+        });
+
+        // Handle segmentation request
+        document.getElementById('segment-btn').addEventListener('click', async function () {
+            if (!bboxCoords) {
+                alert("Please draw a bounding box first!");
+                return;
+            }
+
+            var data = {
+                north: bboxCoords.getNorthEast().lat,
+                south: bboxCoords.getSouthWest().lat,
+                east: bboxCoords.getNorthEast().lng,
+                west: bboxCoords.getSouthWest().lng,
+                text_prompt: "tree"
+            };
+
+            try {
+                let response = await fetch("http://localhost:9000/segment/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+
+                let blob = await response.blob(); // Fetch the TIFF file as a blob
+
+                // Create a URL for the blob
+                let tiffUrl = URL.createObjectURL(blob);
+
+                // Use GeoTIFF.js to load and display the TIFF file
+                let tiff = await GeoTIFF.fromBlob(blob);
+                let image = await tiff.getImage();
+                let rasters = await image.readRasters();
+
+                // Assuming rasters[0] contains the image data
+                if (!rasters || !rasters[0]) {
+                    console.error("No image data found for rasters[0]");
+                    return;
+                }
+
+                // Define the bounding box for the overlay
+                var bounds = [
+                    [bboxCoords.getSouthWest().lat, bboxCoords.getSouthWest().lng],
+                    [bboxCoords.getNorthEast().lat, bboxCoords.getNorthEast().lng]
+                ];
+
+                // Create a Leaflet image overlay using the Blob URL for the TIFF file
+                var imgLayer = L.imageOverlay(tiffUrl, bounds, {
+                    opacity: 0.6,
+                }).addTo(map);
+
+                // Optionally, zoom to fit the bounding box
+                map.fitBounds(bounds);
+
+                // Display the result (optional)
+                document.getElementById('result-container').innerHTML = `
+                    <h2>Segmented Image</h2>
+                    <p>The segmented image has been overlayed on the map.</p>
+                `;
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        });
+    </script>
+
+</body>
+</html>

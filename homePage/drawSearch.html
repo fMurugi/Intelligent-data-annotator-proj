@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation Cover Over Time</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            flex: 1;
+        }
+        #search-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        #search-input {
+            width: 300px;
+            padding: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center;">Vegetation Cover Over Time</h1>
+    <div id="search-container">
+        <input id="search-input" type="text" placeholder="Search for a place (e.g., Mount Kenya Forest)"/>
+        <button id="search-btn">Search</button>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map', { zoom: 13, center: [-1.28333, 36.82194] }); // Centered on Nairobi CBD
+
+        // Add a base tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Leaflet Draw setup
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            draw: {
+                polyline: false,
+                polygon: false,
+                circle: false,
+                marker: false,
+                circlemarker: false,
+                rectangle: true
+            },
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+        map.addControl(drawControl);
+
+        // Handle rectangle drawing
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            drawnItems.addLayer(layer);
+
+            // Get the bounding box
+            var bounds = layer.getBounds();
+            var southWest = bounds.getSouthWest();
+            var northEast = bounds.getNorthEast();
+
+            // Call the GEE API using the bounds
+            fetchVegetationData(southWest, northEast);
+        });
+
+        // Fetch vegetation cover from GEE and display on the map
+        function fetchVegetationData(southWest, northEast) {
+            console.log('Fetching vegetation data for:', southWest, northEast);
+            
+            var vegetationLayer = L.tileLayer(
+                // 'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/b7ad85af47080cb3bcd8b9028d76aa02-bae4447df70742e6b1dbdd6f8e2d6de3/tiles/{z}/{x}/{y}',
+                'https://earthengine.googleapis.com/v1/projects/ee-fionamurugi99/maps/de28d6857e2de428ca4a0094cac15446-f5b10dd39bf4da78b14636da454b4fa3/tiles/{z}/{x}/{y}',
+                
+                {
+                    attribution: "Google Earth Engine - NDVI",
+                    opacity: 0.7
+                }
+            );
+            
+            vegetationLayer.addTo(map);
+        }
+
+        // Add search functionality using Esri Geocoding
+        var geocodeService = L.esri.Geocoding.geocodeService();
+
+        document.getElementById('search-btn').addEventListener('click', function () {
+            var query = document.getElementById('search-input').value;
+            if (!query) {
+                alert('Please enter a location to search.');
+                return;
+            }
+
+            geocodeService.geocode().text(query).run(function (err, results) {
+                if (err) {
+                    console.error('Geocoding error:', err);
+                    alert('Could not find the location. Please try again.');
+                    return;
+                }
+
+                var result = results.results[0];
+                var bounds = result.bounds;
+                map.fitBounds(bounds);
+
+                // Call GEE API with the bounds of the searched location
+                var southWest = bounds.getSouthWest();
+                var northEast = bounds.getNorthEast();
+                fetchVegetationData(southWest, northEast);
+            });
+        });
+    </script>
+</body>
+</html>

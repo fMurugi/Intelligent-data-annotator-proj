@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenya Deforestation Map</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #menu {
+            width: 20%;
+            background-color: #f8f9fa;
+            padding: 15px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+        #map {
+            flex: 1;
+        }
+        .menu-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+            display: block;
+        }
+        .menu-item:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h3>Deforestation Links</h3>
+        <a class="menu-item" href="Kenya_Deforestation_2015_2023.csv" download>📄 Download Deforestation Report</a>
+        <a class="menu-item" href="deforestation_report.html" target="_blank">📊 View Full Report</a>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map (Centered on Kenya)
+        var map = L.map('map').setView([-1.286389, 36.817223], 6); // Centered on Nairobi
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        async function loadDeforestationData() {
+        const response = await fetch("Kenya_Deforestation_2015_2023.csv");
+        if (!response.ok) {
+            console.error("Failed to load CSV file.");
+            return;
+        }
+        const data = await response.text();
+
+        const rows = data.split("\n").slice(1); // Skip header row
+        rows.forEach(row => {
+            const columns = row.split(",");
+            if (columns.length >= 4) {
+                let count = parseInt(columns[1]);  // Deforestation count
+                let year = columns[2];  // Deforestation year
+                let geoJSON = columns[3]; // Coordinates in JSON format
+
+                try {
+                    // ✅ Remove unnecessary quotes around JSON
+                    geoJSON = geoJSON.trim().replace(/^"|"$/g, ''); 
+
+                    // ✅ Convert to valid JSON (single quotes → double quotes)
+                    let formattedGeoJSON = geoJSON.replace(/'/g, '"');
+                    formattedGeoJSON = formattedGeoJSON.replace(/False/g, 'false').replace(/True/g, 'true');
+
+                    let geoObject = JSON.parse(formattedGeoJSON); // Convert to valid JSON
+                    let lon = geoObject.coordinates[0]; // Longitude
+                    let lat = geoObject.coordinates[1]; // Latitude
+
+                    if (count > 6) { // Only display areas where count > 6
+                        L.circleMarker([lat, lon], {
+                            radius: 8,  // Bigger circle for high deforestation
+                            color: "red",  // Red color to highlight risk areas
+                            fillOpacity: 0.8
+                        }).addTo(map)
+                        .bindPopup(`<b>Deforestation Year:</b> ${year} <br> <b>Events:</b> ${count}`);
+                    }
+                } catch (e) {
+                    console.error("Error parsing geoJSON:", e, "RAW:", geoJSON);
+                }
+            }
+        });
+    }
+
+    loadDeforestationData();
+
+
+    </script>
+</body>
+</html>

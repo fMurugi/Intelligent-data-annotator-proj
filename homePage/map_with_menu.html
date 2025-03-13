@@ -20,36 +20,88 @@
             padding: 15px;
             box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        #content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            padding: 20px;
         }
         #map {
             flex: 1;
+            height: 400px; /* Set a fixed height for the map */
+            margin-top: 20px; /* Adds space above the map */
+            margin-bottom: 20px; /* Adds space below the map */
+            border-radius: 10px; /* Optional: rounded corners for map */
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow around the map */
         }
         .menu-item {
             margin: 10px 0;
             padding: 10px;
-            background: #007bff;
-            color: white;
+            background: white;
+            color: black;
             text-align: center;
             text-decoration: none;
             border-radius: 5px;
             display: block;
+            transition: background-color 0.3s;
         }
         .menu-item:hover {
-            background: #0056b3;
+            background: lightgrey;
+        }
+
+        /* Styling for the About section inside the menu */
+        #about {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            width: 100%;
+            background: #f8f9fa;
+            color: black;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        #about img {
+            margin-top: 10px;
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+        }
+
+        #text-content {
+            margin-bottom: 20px; /* Space for additional text above the map */
         }
     </style>
 </head>
 <body>
     <div id="menu">
-        <h3>Links</h3>
-        <a class="menu-item" href="https://colab.research.google.com/github/opengeos/segment-geospatial/blob/main/docs/examples/text_prompts.ipynb#scrollTo=b82_55cWQUlY" target="_blank">Open Google Colab</a>
-        <a class="menu-item" href="https://colab.research.google.com/notebooks/intro.ipynb" target="_blank">Intro Notebook</a>
-        <a class="menu-item" href="https://colab.research.google.com/notebooks/mlcc/first_steps_with_tensorflow.ipynb" target="_blank">TensorFlow Guide</a>
-        <a class="menu-item" href="vegetation_cover.html" target="_blank">View Vegetation Cover</a>
-        <a class="menu-item" href="ndvi_trends.html" target="_blank"> ndvi_trends</a>
-        <a class="menu-item" href="compare_by_year.html" target="_blank">Compare_by_year</a>
+        <h3>Home</h3>
+        <a class="menu-item" href="https://colab.research.google.com/github/opengeos/segment-geospatial/blob/main/docs/examples/text_prompts.ipynb#scrollTo=b82_55cWQUlY" target="_blank">📚 Open Google Colab</a>
+        <a class="menu-item" href="vegetation_cover.html" target="_blank">🌿 View Vegetation Cover</a>
+        <a class="menu-item" href="ndvi_trends.html" target="_blank">📈 ndvi_trends</a>
+        <a class="menu-item" href="compare_by_year.html" target="_blank">🔥 Compare_by_year</a>
+        <a class="menu-item" href="deforestation_report.html" target="_blank">📥 Download deforestation report</a>
+        <a class="menu-item" href="deforestation_report_display.html" target="_blank">📊 Display deforestation report</a>
+
+        <!-- About section in the menu -->
+        <div id="about">
+            <h3>About the Project</h3>
+            <p>This project aims to provide a comprehensive suite of geospatial analysis tools that are accessible to anyone interested in studying environmental changes. The tools include vegetation cover analysis, deforestation reporting, and trends related to climate change impacts on ecosystems.</p>
+            <img src="https://i.imgur.com/UbOXYAU.png" alt="Globe Logo">
+        </div>
     </div>
-    <div id="map"></div>
+
+    <div id="content">
+        <div id="text-content">
+            <h4>Geospatial Environmental Tools</h4>
+            <p>This map visualization showcases key environmental insights and trends, including deforestation, vegetation cover, and NDVI trends, to monitor climate change and its impact on ecosystems.</p>
+        </div>
+        <div id="map"></div>
+    </div>
 
     <script>
         // Initialize the map

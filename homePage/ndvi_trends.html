@@ -49,6 +49,12 @@
 
     <div id="map"></div>
 
+    <div id="loading" style="display: none; text-align: center; padding: 10px;">
+        <p>Loading NDVI Trends... Please wait.</p>
+        <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." width="50">
+    </div>
+    
+
     <div id="chart-container">
         <canvas id="ndvi-chart"></canvas>
     </div>
@@ -98,6 +104,8 @@
         function fetchVegetationNDVI(southWest, northEast) {
             console.log("Fetching NDVI trends for:", southWest, northEast);
 
+             // Show loading indicator
+            document.getElementById("loading").style.display = "block";
             fetch('http://127.0.0.1:5000/get_ndvi_trends', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -119,7 +127,13 @@
 
                 updateChart(data.years, data.ndvi_values);
             })
-            .catch(error => console.error("Error fetching NDVI trends:", error));
+            .catch(error => console.error("Error fetching NDVI trends:", error))
+            .finally(()=>{
+                        // Hide loading indicator
+                document.getElementById("loading").style.display = "none";
+
+            });
+            
         }
 
         function updateChart(years, ndviValues) {

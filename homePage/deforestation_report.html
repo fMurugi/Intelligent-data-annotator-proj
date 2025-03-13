@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenya Deforestation Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        table {
+            width: 80%;
+            margin: auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h2>Kenya Deforestation Report (2015 - 2023)</h2>
+    <p>This report provides an overview of deforestation trends in Kenya.</p>
+
+    <!-- Table to display CSV content -->
+    <table id="csvTable">
+        <thead>
+            <tr>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Deforestation Year</th>
+                <th>Deforestation Count</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <p><a href="Kenya_Deforestation_2015_2023.csv" download>📄 Download Full Report (CSV)</a></p>
+
+    <script>
+        async function loadCSV() {
+            try {
+                const response = await fetch("Kenya_Deforestation_2015_2023.csv");
+                if (!response.ok) {
+                    throw new Error("Failed to load CSV file");
+                }
+                const data = await response.text();
+
+                const rows = data.split("\n").slice(1); // Skip header row
+                let tableBody = document.querySelector("#csvTable tbody");
+
+                rows.forEach(row => {
+                    const columns = row.split(",");
+                    if (columns.length >= 4) {
+                        let count = columns[1];   // Deforestation count
+                        let year = columns[2];    // Deforestation year
+                        let geoJSON = columns[3]; // Coordinates in JSON format
+
+                        // Extract latitude and longitude from the `.geo` column
+                        try {
+                            let geoObject = JSON.parse(geoJSON.replace(/'/g, '"')); // Convert to valid JSON
+                            let lon = geoObject.coordinates[0]; // Longitude
+                            let lat = geoObject.coordinates[1]; // Latitude
+
+                            let tr = document.createElement("tr");
+                            tr.innerHTML = `<td>${lat}</td><td>${lon}</td><td>${year}</td><td>${count}</td>`;
+                            tableBody.appendChild(tr);
+                        } catch (e) {
+                            console.error("Error parsing geoJSON:", e);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error loading CSV:", error);
+                document.body.innerHTML += `<p style="color:red;">Error loading deforestation data. Ensure the CSV file is correctly formatted.</p>`;
+            }
+        }
+
+        loadCSV();
+    </script>
+</body>
+</html>

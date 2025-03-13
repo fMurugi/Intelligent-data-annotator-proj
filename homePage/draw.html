@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegetation Cover Over Time</title>
+    
+    <!-- Load Google API -->
+    <script async defer src="https://apis.google.com/js/api.js"></script>
+    <script src="https://code.earthengine.google.com/earthengine-api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            flex: 1;
+        }
+        #search-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        #search-input {
+            width: 300px;
+            padding: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center;">Vegetation Cover Over Time</h1>
+    <div id="search-container">
+        <input id="search-input" type="text" placeholder="Search for a place (e.g., Mount Kenya Forest)"/>
+        <button id="search-btn">Search</button>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Ensure GAPI is loaded before calling functions
+        function onGapiLoad() {
+            console.log("Google API client loaded.");
+            loadGoogleAPI();
+        }
+
+        function loadGoogleAPI() {
+            console.log("Initializing Google API client...");
+            
+            gapi.load('client:auth2', function() {
+                gapi.client.init({
+                    clientId: '19603944398-m1s8qf5ive0cqlaijgf6309jgil2lg2t.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/earthengine',
+                    discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/earthengine/v1/rest"],
+                    ux_mode: "popup",  // Forces OAuth to use redirect mode instead of popup
+                    redirect_uri: "http://localhost:8000/"
+                }).then(function() {
+                    console.log("Google API client initialized!");
+                    authenticateUser();
+                }).catch(function(error) {
+                    console.error("Error initializing Google API client:", error);
+                });
+            });
+        }
+
+        function authenticateUser() {
+            gapi.auth2.getAuthInstance().signIn().then(function() {
+                console.log("User signed in!");
+                var token = gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token;
+                
+                // Authenticate with Google Earth Engine
+                ee.data.authenticateViaOAuthToken(token, function() {
+                    console.log("Google Earth Engine authenticated!");
+                    ee.initialize();
+                }, function(error) {
+                    console.error("Error authenticating with GEE:", error);
+                });
+            }).catch(function(error) {
+                console.error("User authentication failed:", error);
+            });
+        }
+
+        // Ensure GAPI is loaded before running functions
+        window.onload = function() {
+            if (typeof gapi !== 'undefined') {
+                onGapiLoad();
+            } else {
+                console.log("Waiting for GAPI to load...");
+                setTimeout(onGapiLoad, 2000);
+            }
+        };
+    </script>
+</body>
+</html>

@@ -10,6 +10,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
 
+    <!-- PDF & Image Capture Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 
@@ -19,31 +23,34 @@
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
+            flex-direction: column;
         }
-        /* .map-container {
-            flex: 1;
-            height: 100%;
-            position: relative;
-        } */
         .map-container {
             flex: 1;
             height: 100%;
             position: relative;
-            border: 2px solid black;  /* ✅ Adds a border around each map */
-            margin: 5px;  /* ✅ Adds spacing between maps */
-            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);  /* ✅ Adds a shadow effect */
+            border: 2px solid black;
+            margin: 5px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
         }
-
         #controls {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: white;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
             padding: 10px;
+            background: white;
+            border-bottom: 2px solid black;
+        }
+        .download-btn {
+            background: #28a745;
+            color: white;
+            padding: 10px;
+            border: none;
             border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+        }
+        .download-btn:hover {
+            background: #218838;
         }
     </style>
 </head>
@@ -56,24 +63,23 @@
         <input type="number" id="past-year" min="2000" max="2025" value="2000">
         <label for="current-year">Current Year:</label>
         <input type="number" id="current-year" min="2000" max="2025" value="2025">
+        <button id="download-pdf" class="download-btn">📄 Download PDF</button>
     </div>
 
-    <div class="map-container">
+    <div class="map-container" id="map-left-container">
         <h3 style="text-align:center;">Past NDVI</h3>
         <div id="map-left" style="height: 90%;"></div>
     </div>
     
-    <div class="map-container">
+    <div class="map-container" id="map-right-container">
         <h3 style="text-align:center;">Current NDVI</h3>
         <div id="map-right" style="height: 90%;"></div>
     </div>
 
     <script>
-        // Initialize two maps
         var mapLeft = L.map('map-left').setView([-1.28333, 36.82194], 8);
         var mapRight = L.map('map-right').setView([-1.28333, 36.82194], 8);
 
-        // Add base map layers
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(mapLeft);
@@ -82,7 +88,6 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(mapRight);
 
-        // Prevent infinite loop when synchronizing maps
         let isSyncing = false;
         function syncMaps(sourceMap, targetMap) {
             sourceMap.on("moveend", function () {
@@ -93,7 +98,6 @@
             });
         }
 
-        // Apply synchronization
         syncMaps(mapLeft, mapRight);
         syncMaps(mapRight, mapLeft);
 
@@ -134,8 +138,6 @@
         }
 
         function fetchNDVI(southWest, northEast, year, side) {
-            console.log("Fetching NDVI for:", southWest, northEast, "Year:", year, "Side:", side);
-
             fetch('http://127.0.0.1:5000/get_ndvi', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -149,8 +151,6 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("NDVI API Response:", data);
-
                 if (!data.map_url) {
                     alert("Failed to load vegetation data.");
                     return;
@@ -179,6 +179,57 @@
             if (lastSearchBounds) fetchNDVI(lastSearchBounds[0], lastSearchBounds[1], this.value, "right");
         });
 
+        // 📄 Generate PDF with both maps
+        document.getElementById("download-pdf").addEventListener("click", async function () {
+        const { jsPDF } = window.jspdf;
+        let pdf = new jsPDF("p", "mm", "a4"); // Portrait, millimeters, A4 size
+
+        let locationName = document.getElementById("search-input").value || "Unknown Location";
+        let pastYear = document.getElementById("past-year").value;
+        let currentYear = document.getElementById("current-year").value;
+
+        async function captureMap(mapElementId) {
+            return new Promise((resolve) => {
+                let mapElement = document.getElementById(mapElementId);
+                
+                // Ensure the map tiles are loaded before capturing
+                setTimeout(async () => {
+                    html2canvas(mapElement, {
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: false,
+                        scale: 3 // Increases resolution for clearer images
+                    }).then(canvas => {
+                        resolve(canvas.toDataURL("image/png"));
+                    });
+                }, 2000); // Wait 2 seconds to ensure map rendering is complete
+            });
+        }
+
+        // Capture both maps
+        let leftImage = await captureMap("map-left-container");
+        let rightImage = await captureMap("map-right-container");
+
+        // 📄 Add title and location info
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(16);
+        pdf.text("NDVI Comparison Report", 105, 15, { align: "center" });
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(12);
+        pdf.text(`Location: ${locationName}`, 10, 25);
+        pdf.text(`Comparison: ${pastYear} vs. ${currentYear}`, 10, 35);
+
+        // 📌 Add images (making them bigger and clearer)
+        pdf.addImage(leftImage, "PNG", 10, 45, 90, 80);  // Left map (Past NDVI)
+        pdf.text(`Past NDVI (${pastYear})`, 45, 130, { align: "center" });
+
+        pdf.addImage(rightImage, "PNG", 110, 45, 90, 80); // Right map (Current NDVI)
+        pdf.text(`Current NDVI (${currentYear})`, 145, 130, { align: "center" });
+
+        // 📄 Save the PDF file
+        pdf.save(`NDVI_Comparison_${locationName}_${pastYear}_vs_${currentYear}.pdf`);
+    });
     </script>
 
 </body>
